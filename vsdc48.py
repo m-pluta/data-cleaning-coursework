@@ -29,7 +29,7 @@ colorHashMap = {
     r".*(green|sage|soft mint|dark moss).*": "green",
     r".*(gold).*": "gold",
     r".*(almond|beige mousse|lunar light|dune).*": "beige", #TODO Need to justify this
-    r".*(punk pink|electro punk).*": "pink",    
+    r".*(punk pink|electro punk).*": "pink",
     r".*(information not available|rgb backlit|touchscreen|evo i7-1260p|acronym).*": np.NaN
 }
 df['color'] = df['color'].replace(colorHashMap, regex=True)
@@ -41,7 +41,7 @@ df['color'] = df['color'].replace(colorHashMap, regex=True)
 brandHashMap = {
     r".*(enovo).*": "lenovo",
     r".*(carlisle foodservice products|best notebooks|computer upgrade king|quality refurbished computers|microtella|ctl|lpt|rokc|elo|gizpro|jtd).*": np.NaN,
-    r".*(toughbook).*": "panasonic",
+    r".*(toughbook).*": "panasonic", #TODO move toughbook to the model later
     r".*(latitude).*": "dell"
 }
 df['brand'] = df['brand'].replace(brandHashMap, regex=True)
@@ -57,8 +57,26 @@ df['screen_size'] = df['screen_size'].str.replace(' inches', '').astype(float)
 
 # Adjust harddisk sizes to be more consistent
 
+def convert_to_gb(harddisk):
+    size = str(harddisk)
 
+    if pd.isnull(size):
+        return size
+    elif size.endswith('tb'):
+        return float(size.replace(' tb', '')) * 1000
+    elif size.endswith('gb'):
+        return float(size.replace(' gb', ''))
+    elif size.endswith('mb'):
+        return float(size.replace(' mb', ''))
+    else:
+        if float(size) < 16:
+            return float(size) * 1000
+        else:
+            return float(size)
+    
+    return np.NaN
 
+df['harddisk'] = df['harddisk'].apply(convert_to_gb)
 
 
 # Output data to file
@@ -70,10 +88,11 @@ def outputDataToFile():
 
 
 # Testing using watch
-print("Rows: ", df.shape[0])
+print("Total rows: ", df.shape[0])
 
-unique_elems = Counter(df['screen_size'].tolist())
+unique_elems = Counter(df['harddisk'].dropna().tolist())
 print(unique_elems)
+
 # print(Counter(' '.join(df['model'].astype(str).apply(lambda x: ' '.join(word for word in x.split() if word.isalpha())).fillna('')).split()))
 
 outputDataToFile()
