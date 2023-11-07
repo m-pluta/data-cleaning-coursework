@@ -138,8 +138,9 @@ df['cpu_speed'] = df['cpu_speed'].apply(normaliseCPU)
 # Testing using watch
 print("Total rows: ", df.shape[0])
 
-unique_elems = Counter(df['OS'].dropna().tolist())
-print(unique_elems)
+unique_elems = Counter(df['model'].dropna().tolist())
+for el in unique_elems:
+    print(el)
 
 # Most common words in the model column
 # print(Counter(' '.join(df['model'].astype(str).apply(lambda x: ' '.join(word for word in x.split() if word.isalpha())).fillna('')).split()))
