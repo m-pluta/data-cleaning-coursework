@@ -3,8 +3,7 @@ import numpy as np
 from collections import Counter
 import re
 
-OUT_FILEPATH = 'output_data_test.xlsx'
-
+OUT_FILEPATH = 'output_data.xlsx'
 
 ##### Problem 1
 
@@ -62,12 +61,19 @@ def standardiseBrands(df):
 
     return df
 
-def cleanScreenSizes(df):
-    # Remove 'inches' from screen sizes and convert screen sizes to float
-    # Reasoning: Removing inches allows the values to be converted from a categorical to a continuous scale.
-    #            This allows for better data visualisation attempts.
-    df['screen_size'] = df['screen_size'].str.replace(' inches', '').astype(float)
+# Function to extract numerical values
+def extract_numerical_value(price):
+    if pd.isna(price):
+        return np.nan
+    numerical_value = re.search(r'\d+(\.\d+)?', price.replace(",", "")).group()
+    return float(numerical_value)
 
+def cleanScreensPrices(df):
+    # Remove 'inches' from screen sizes and '$' from prices. Convert these values to floats
+    # Reasoning: Removing 'inches' and '$' allows the values to be converted from a categorical string type to a continuous scale.
+    #            This allows for better data visualisation.
+    df['screen_size'] = df['screen_size'].apply(extract_numerical_value)
+    df['price'] = df['price'].apply(extract_numerical_value)
     return df
 
 def convert_to_gb(size, tb_possible = False):
@@ -155,12 +161,13 @@ def normaliseCPUSpeeds(df):
 def outputDataToFile(df):
     df.to_excel(OUT_FILEPATH, index=False)  # index=False to exclude the index column in the output file
 
+
 if __name__ == "__main__":
     df = pd.read_excel('amazon_laptop_2023.xlsx')
     df = initialCleaning(df)
     df = standardiseColours(df)
     df = standardiseBrands(df)
-    df = cleanScreenSizes(df)
+    df = cleanScreensPrices(df)
     df = convertRamDiskSizesToGB(df)
     df = standardiseOS(df)
     df = normaliseCPUSpeeds(df)
