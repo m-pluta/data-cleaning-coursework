@@ -4,7 +4,6 @@ from collections import Counter
 import re
 
 OUT_FILEPATH = 'output_data.xlsx'
-
 ##### Problem 1
 
 def initialCleaning(df):
@@ -63,7 +62,6 @@ def standardiseBrands(df):
 
     return df
 
-# Function to extract numerical values
 def extract_numerical_value(price):
     if pd.isna(price):
         return np.nan
@@ -175,24 +173,17 @@ def renameColumns(df):
 def outputDataToFile(df):
     df.to_excel(OUT_FILEPATH, index=False)  # index=False to exclude the index column in the output file
 
-
 if __name__ == "__main__":
+    function_calls = [initialCleaning, standardiseColours, standardiseBrands, 
+                      cleanScreensPrices, convertRamDiskSizesToGB, standardiseOS, 
+                      normaliseCPUSpeeds, renameColumns]
+    
     df = pd.read_excel('amazon_laptop_2023.xlsx')
-
-    numerical_features = []
-    categorical_features = []
-
-
-    df = initialCleaning(df)
-    df = standardiseColours(df)
-    df = standardiseBrands(df)
-    df = cleanScreensPrices(df)
-    df = convertRamDiskSizesToGB(df)
-    df = standardiseOS(df)
-    df = normaliseCPUSpeeds(df)
-    df = renameColumns(df)
-
+    for function in function_calls:
+        df = function(df)
     outputDataToFile(df)
+
+    ### TESTING ###
 
     print("Total rows: ", df.shape[0])
     print(df.dtypes)
