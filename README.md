@@ -1,3 +1,4 @@
+0. Drop columns that are all NaN
 1. Drop rows where all values are NaN
 2. Convert all rows to lowercase
 3. Remove duplicate rows
@@ -23,4 +24,9 @@
 
 13. Convert os systems to standard systems
 
+14. Standardise prices to not have dollars
+
+
+
+19. Rename columns to more appropriate names
 20. Explode all rows where laptops can have multiple colours

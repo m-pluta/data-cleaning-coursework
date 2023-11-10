@@ -8,6 +8,9 @@ OUT_FILEPATH = 'output_data.xlsx'
 ##### Problem 1
 
 def initialCleaning(df):
+    # Drop columns where all entries are NaN
+    df.dropna(axis = 1, how="all", inplace=True)
+
     # Drop rows where all values are NaN
     df.dropna(how='all', inplace=True)
 
@@ -21,8 +24,7 @@ def initialCleaning(df):
     df = df.drop_duplicates(ignore_index=True)
 
     # Remove all laptops that don't include any model numbers
-    # Reasoning: Laptops with no model number will be very difficult for the person to find. 
-    #            Many different manufacturers can create
+    # Reasoning: Laptops with no model number will be very difficult for the person to find.
     df.dropna(subset=['model'], inplace=True)
 
     return df
@@ -151,12 +153,24 @@ def normaliseCPUSpeeds(df):
         match = re.search(r'((\d+\.\d+|\d+))', cpu_speed)
         if match:
             value = float(match.group())
-            if value > 6:
+            if value > 10:
                 value /= 1000
+            return value
   
     df['cpu_speed'] = df['cpu_speed'].apply(normaliseCPU)
 
     return df
+
+def renameColumns(df):
+    columnNameHashMap = {
+        'screen_size': 'screen_size_inches',
+        'color': 'colour',
+        'harddisk': 'harddisk_gb',
+        'ram': 'ram_gb',
+        'cpu_speed': 'cpu_speed_ghz',
+        'price': 'price_usd'
+    }
+    return df.rename(columns=columnNameHashMap)
 
 def outputDataToFile(df):
     df.to_excel(OUT_FILEPATH, index=False)  # index=False to exclude the index column in the output file
@@ -164,6 +178,11 @@ def outputDataToFile(df):
 
 if __name__ == "__main__":
     df = pd.read_excel('amazon_laptop_2023.xlsx')
+
+    numerical_features = []
+    categorical_features = []
+
+
     df = initialCleaning(df)
     df = standardiseColours(df)
     df = standardiseBrands(df)
@@ -171,10 +190,12 @@ if __name__ == "__main__":
     df = convertRamDiskSizesToGB(df)
     df = standardiseOS(df)
     df = normaliseCPUSpeeds(df)
+    df = renameColumns(df)
 
     outputDataToFile(df)
 
     print("Total rows: ", df.shape[0])
+    print(df.dtypes)
 
     {
     # unique_elems = Counter(df['model'].dropna().tolist())
