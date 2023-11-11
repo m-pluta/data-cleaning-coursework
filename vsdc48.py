@@ -52,12 +52,46 @@ def normaliseModels(df):
     regexModelYear = r'(\(2021\)|\(2022\)|2021|2022|2023)'
     df['model'] = df['model'].str.replace(regexModelYear, '', regex=True)
 
-    regexScreenSize = r'((\d{1,2}(?:\.\d{1,2})?)[ -]?(?:inch|\"))'
+    # Reasoning: The screen size is already included in the screen_size column and it is often more precise in that column
+    #            This was verified by examining the data, therefore redundant data
+    regexScreenSize = r'((\d{2}(?:\.\d{1,2})?)[ -]?(?:inch|\"))'
     df['model'] = df['model'].str.replace(regexScreenSize, '', regex=True)
+
+    # Reasoning: No need to keep model data within brackets, clearer without
+    #            Only affects a small portion of total rows, determined by examining the data
+    df['model'] = df['model'].str.replace(r'\(|\)', '', regex=True)
 
     # Reasoning: Marketing gibberish is not useful
     #            Pointless information, the dataset is about laptops
     df['model'] = df['model'].str.replace(r'newest|laptop', '', regex=True)
+
+    # Reasoning: Only use spaces as seperation characters for consistency
+    df['model'] = df['model'].str.replace(r'[(?:\s+),/\\\-_\*]', ' ', regex=True)
+
+
+    # Extract DD.D screen sizes
+
+    # Extract D.D CPU speeds
+
+    # Extract w7p, w10p Check if the existing OS value matches
+
+    # Extract CPU brands and series
+
+    # Remove the 'victus by hp'
+
+    # Extract 1yr warranty to special features
+
+    # Extract ram and storage values and compare with existing
+
+
+
+
+
+    
+
+    # Reasoning: Remove unnecessary characters from the column
+    df['model'] = df['model'].replace('\s+', ' ', regex=True)
+    df['model'] = df['model'].str.strip(', ')
     return df
 
 def standardiseColours(df):

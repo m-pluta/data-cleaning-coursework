@@ -1,10 +1,11 @@
 1. Drop columns that are all NaN
 2. Drop rows where all values are NaN
-3. Convert all rows to lowercase
+3. Remove all laptops that don't include any model numbers
 4. Remove duplicate rows
-5. Remove all laptops that don't include any model numbers
+5. Convert all rows to lowercase
+6. Reset Index of DataFrame
 
-6. Extract information from model column
+7. Extract information from model column
     - Remove 'laptop' from model
     - Remove 'newest' from model
     - Extract RAM and DISK
@@ -12,12 +13,14 @@
     - 'victus by hp 15.6 inch gaming laptop pc 15-fa1010nr'
     - Extract color
 
-7. Extract rgb backlit|touchscreen|evo i7-1260p from colours
+8. Extract rgb backlit|touchscreen|evo i7-1260p from colours
 
-    ? 8. Explode all rows where laptops can have multiple colours
+    THIS MUST BE DONE WITH EXACT COLOURS - CURRENTLY IT IS WRONG e.g. "cover: red ; inner/keyboard: black"
+
+    ?8. Explode all rows where laptops can have multiple colours
     Considered but not actually correct
     
-    9. Convert colours to standard colours
+9. Convert colours to standard colours
 
 10. Convert all 'enovo' to 'lenovo' and other regex
 11. Extract toughbook and latitude from brand into model column
