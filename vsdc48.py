@@ -28,6 +28,23 @@ def initialCleaning(df):
 
     return df
 
+def extractDataFromModels(df):
+    extractions = [r'(detachable 2-in-1|detachable 2 in 1)', r'(detachable)', r'(2 in 1|2-in-1)']
+
+    for extraction in extractions:
+        extracted_values = df['model'].str.extract(extraction, expand=False)
+        df['special_features'] = df['special_features'].fillna('') + ', ' + extracted_values.fillna('')
+        df['special_features'] = df['special_features'].str.strip(", ")
+        df['model'] = df['model'].replace(extraction, '', regex=True)
+
+    df['special_features'] = df['special_features'].str.replace('2 in 1', '2-in-1')
+    return df
+
+def normaliseModels(df):
+    df['model'] = df['model'].str.replace('laptop', '')
+    df = extractDataFromModels(df)
+    return df
+
 def standardiseColours(df):
     # Reasoning: Reduces variability in the dataset due to misspellings, variations and interpretations
     #            Reducuing the variability also helps with categorization which is use for data exploration and visualization
@@ -44,7 +61,7 @@ def standardiseColours(df):
         r".*(gold).*": "gold",
         r".*(almond|beige mousse|lunar light|dune).*": "beige", #TODO Need to justify this
         r".*(punk pink|electro punk).*": "pink",
-        r".*(information not available|rgb backlit|touchscreen|evo i7-1260p|acronym).*": np.NaN #TODO extract information from here
+        # r".*(information not available|rgb backlit|touchscreen|evo i7-1260p|acronym).*": np.NaN #TODO extract information from here
     }
     df['color'] = df['color'].replace(colorHashMap, regex=True)
 
@@ -55,8 +72,8 @@ def standardiseBrands(df):
     brandHashMap = {
         r".*(enovo).*": "lenovo",
         r".*(carlisle foodservice products|best notebooks|computer upgrade king|quality refurbished computers|microtella|ctl|lpt|rokc|elo|gizpro|jtd).*": np.NaN,
-        r".*(toughbook).*": "panasonic", #TODO move toughbook to the model later
-        r".*(latitude).*": "dell" #TODO ensure all latitude dells have dell as brand and latitude as model
+        # r".*(toughbook).*": "panasonic", #TODO move toughbook to the model later
+        # r".*(latitude).*": "dell" #TODO ensure all latitude dells have dell as brand and latitude as model
     }
     df['brand'] = df['brand'].replace(brandHashMap, regex=True)
 
@@ -174,9 +191,11 @@ def outputDataToFile(df):
     df.to_excel(OUT_FILEPATH, index=False)  # index=False to exclude the index column in the output file
 
 if __name__ == "__main__":
-    function_calls = [initialCleaning, standardiseColours, standardiseBrands, 
-                      cleanScreensPrices, convertRamDiskSizesToGB, standardiseOS, 
-                      normaliseCPUSpeeds, renameColumns]
+    # function_calls = [initialCleaning, normaliseModels, standardiseColours, standardiseBrands, 
+    #                  cleanScreensPrices, convertRamDiskSizesToGB, standardiseOS, 
+    #                  normaliseCPUSpeeds, renameColumns]
+
+    function_calls = [initialCleaning, normaliseModels]
     
     df = pd.read_excel('amazon_laptop_2023.xlsx')
     for function in function_calls:
@@ -186,13 +205,14 @@ if __name__ == "__main__":
     ### TESTING ###
 
     print("Total rows: ", df.shape[0])
-    print(df.dtypes)
+    # print(df.dtypes)
 
-    {
+
     # unique_elems = Counter(df['model'].dropna().tolist())
     # for el in unique_elems:
     #     print(el)
 
     # Most common words in the model column
-    # print(Counter(' '.join(df['model'].astype(str).apply(lambda x: ' '.join(word for word in x.split() if word.isalpha())).fillna('')).split()))  
-    }
+    myCounter = Counter(' '.join(df['model'].astype(str).apply(lambda x: ' '.join([word for word in x.split() if not word.isdigit()]))).split())
+    for el, count in myCounter.most_common():
+        print(f"{el}: {count}")
