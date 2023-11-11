@@ -53,9 +53,10 @@ def normaliseModels(df):
     df['model'] = df['model'].str.replace(regexModelYear, '', regex=True)
 
     # Reasoning: The screen size is already included in the screen_size column and it is often more precise in that column
-    #            This was verified by examining the data, therefore redundant data
+    #            This was verified by examining the data, therefore redundant data. Affects 18 laptops
     regexScreenSize = r'((\d{2}(?:\.\d{1,2})?)[ -]?(?:inch|\"))'
     df['model'] = df['model'].str.replace(regexScreenSize, '', regex=True)
+    df['model'] = df['model'].str.replace(r'(\d{2}\.\d{1,2})', '', regex=True)
 
     # Reasoning: No need to keep model data within brackets, clearer without
     #            Only affects a small portion of total rows, determined by examining the data
@@ -67,9 +68,6 @@ def normaliseModels(df):
 
     # Reasoning: Only use spaces as seperation characters for consistency
     df['model'] = df['model'].str.replace(r'[(?:\s+),/\\\-_\*]', ' ', regex=True)
-
-
-    # Extract DD.D screen sizes
 
     # Extract D.D CPU speeds
 
