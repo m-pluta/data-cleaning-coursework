@@ -31,20 +31,26 @@ def initialCleaning(df):
     return df
 
 def extractDataFromModels(df):
-    extractions = [r'(detachable 2-in-1|detachable 2 in 1)', r'(detachable)', r'(2 in 1|2-in-1)']
+    def extractDetachable2in1(row):
+        regexHashMap = {
+            r'(detachable 2-in-1|detachable 2 in 1)': 'detachable 2-in-1',
+            r'(detachable)': 'detachable',
+            r'(2 in 1|2-in-1)': '2-in-1'
+        }
+        for pattern in regexHashMap:
+            print(row['model'], print(type(row['model'])))
+            if re.search(pattern, str(row['model'])):
+                target = 'special_features'
+                row[target] = regexHashMap[pattern] if pd.isna(row[target]) else (row[target] + ', ' + regexHashMap[pattern])
+                row['model'] = re.sub(pattern, '', str(row['model']))
 
-    for extraction in extractions:
-        extracted_values = df['model'].str.extract(extraction, expand=False)
-        df['special_features'] = df['special_features'].fillna('') + ', ' + extracted_values.fillna('')
-        df['special_features'] = df['special_features'].str.strip(", ")
-        df['model'] = df['model'].replace(extraction, '', regex=True)
-
-    df['special_features'] = df['special_features'].str.replace('2 in 1', '2-in-1')
+        return row
+    df = df.apply(extractDetachable2in1, axis=1)
     return df
 
 def normaliseModels(df):
-    df['model'] = df['model'].str.replace('laptop', '')
     df = extractDataFromModels(df)
+    df['model'] = df['model'].str.replace('laptop', '')
     return df
 
 def standardiseColours(df):
