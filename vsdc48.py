@@ -13,18 +13,20 @@ def initialCleaning(df):
     # Drop rows where all values are NaN
     df.dropna(how='all', inplace=True)
 
-    # Convert all rows to lowercase
-    # Reasoning: For consistency in data between columns, Different cases increase the dimensionality of the data.
-    #            One case also allows easy comparisons between data and checking for duplicates.
-    df = df.map(lambda x: x.lower() if isinstance(x, str) else x)
+    # Remove all laptops that don't include any model numbers
+    # Reasoning: Laptops with no model number will be very difficult for the person to find.
+    df.dropna(subset=['model'], inplace=True)
 
     # Remove duplicate rows
     # Reasoning: Redundant information that unnecessarily skews the data
     df = df.drop_duplicates(ignore_index=True)
 
-    # Remove all laptops that don't include any model numbers
-    # Reasoning: Laptops with no model number will be very difficult for the person to find.
-    df.dropna(subset=['model'], inplace=True)
+    # Convert all rows to lowercase
+    # Reasoning: For consistency in data between columns, Different cases increase the dimensionality of the data.
+    #            One case also allows easy comparisons between data and checking for duplicates.
+    df = df.map(lambda x: x.lower() if isinstance(x, str) else x)
+
+    df.reset_index(drop=True, inplace=True)
 
     return df
 
