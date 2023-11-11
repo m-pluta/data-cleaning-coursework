@@ -30,7 +30,9 @@ def initialCleaning(df):
 
     return df
 
-def extractDataFromModels(df):
+def normaliseModels(df):
+    # Reasoning: A laptop being a 2-in-1 or being detachable is more of a special feature. 
+    #            Hence it should be extracted from the model column and placed in the special_features column
     def extractDetachable2in1(row):
         regexHashMap = {
             r'(detachable 2-in-1|detachable 2 in 1)': 'detachable 2-in-1',
@@ -38,7 +40,6 @@ def extractDataFromModels(df):
             r'(2 in 1|2-in-1)': '2-in-1'
         }
         for pattern in regexHashMap:
-            print(row['model'], print(type(row['model'])))
             if re.search(pattern, str(row['model'])):
                 target = 'special_features'
                 row[target] = regexHashMap[pattern] if pd.isna(row[target]) else (row[target] + ', ' + regexHashMap[pattern])
@@ -46,11 +47,17 @@ def extractDataFromModels(df):
 
         return row
     df = df.apply(extractDetachable2in1, axis=1)
-    return df
 
-def normaliseModels(df):
-    df = extractDataFromModels(df)
-    df['model'] = df['model'].str.replace('laptop', '')
+    # Reasoning: Only 6 laptops contain the release year so there isn't enough data and also the release year isnt important enough info
+    regexModelYear = r'(\(2021\)|\(2022\)|2021|2022|2023)'
+    df['model'] = df['model'].str.replace(regexModelYear, '', regex=True)
+
+    regexScreenSize = r'((\d{1,2}(?:\.\d{1,2})?)[ -]?(?:inch|\"))'
+    df['model'] = df['model'].str.replace(regexScreenSize, '', regex=True)
+
+    # Reasoning: Marketing gibberish is not useful
+    #            Pointless information, the dataset is about laptops
+    df['model'] = df['model'].str.replace(r'newest|laptop', '', regex=True)
     return df
 
 def standardiseColours(df):
@@ -198,29 +205,37 @@ def renameColumns(df):
 def outputDataToFile(df):
     df.to_excel(OUT_FILEPATH, index=False)  # index=False to exclude the index column in the output file
 
+def printNumEmpty(df):
+    emptyStrings = df.eq('').sum()
+    nulls = df.isnull().sum()
+
+    print('COLUMN_NAME'.ljust(21) + '\'\''.rjust(3) + 'null'.rjust(7))
+
+    for column in df.columns.tolist():
+        print(column.ljust(21), end="")
+        print(str(emptyStrings[column]).rjust(3), end="")
+        print(str(nulls[column]).rjust(7), end="\n")
+
 if __name__ == "__main__":
     # function_calls = [initialCleaning, normaliseModels, standardiseColours, standardiseBrands, 
     #                  cleanScreensPrices, convertRamDiskSizesToGB, standardiseOS, 
     #                  normaliseCPUSpeeds, renameColumns]
 
     function_calls = [initialCleaning, normaliseModels]
-    
     df = pd.read_excel('amazon_laptop_2023.xlsx')
+
     for function in function_calls:
         df = function(df)
+
     outputDataToFile(df)
 
     ### TESTING ###
 
-    print("Total rows: ", df.shape[0])
+    # print("Total rows: ", df.shape[0])
     # print(df.dtypes)
+    printNumEmpty(df)
 
-
-    # unique_elems = Counter(df['model'].dropna().tolist())
-    # for el in unique_elems:
-    #     print(el)
-
-    # Most common words in the model column
-    myCounter = Counter(' '.join(df['model'].astype(str).apply(lambda x: ' '.join([word for word in x.split() if not word.isdigit()]))).split())
-    for el, count in myCounter.most_common():
-        print(f"{el}: {count}")
+    # # Most common words in the model column
+    # myCounter = Counter(' '.join(df['model'].astype(str).apply(lambda x: ' '.join([word for word in x.split() if not word.isdigit()]))).split())
+    # for el, count in myCounter.most_common():
+    #     print(f"{el}: {count}")

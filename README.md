@@ -5,7 +5,8 @@
 5. Remove all laptops that don't include any model numbers
 
 6. Extract information from model column
-    - Remove ''laptop' from model
+    - Remove 'laptop' from model
+    - Remove 'newest' from model
     - Extract RAM and DISK
     - Extract 'detachable 2 in 1' and '2 in 1' (they are different)
     - 'victus by hp 15.6 inch gaming laptop pc 15-fa1010nr'
@@ -20,6 +21,8 @@
 
 10. Convert all 'enovo' to 'lenovo' and other regex
 11. Extract toughbook and latitude from brand into model column
+
+12. Remove redundant brands from model column
 
 12. Remove 'inches' from screen sizes and convert screen sizes to float
 
@@ -36,3 +39,4 @@
 
 19. Standardise prices to not have dollars
 20. Rename columns to more appropriate names
+21. If there are identical laptops with different prices, only keep the cheapest
