@@ -64,7 +64,16 @@ def normaliseModels(df):
 
     # Reasoning: Marketing gibberish is not useful
     #            Pointless information, the dataset is about laptops
-    df['model'] = df['model'].str.replace(r'newest|laptop', '', regex=True)
+    #            A 'mobile workstation' and 'commercial notebook pc' don't offer any new information other than 'laptop'
+    df['model'] = df['model'].str.replace(r'newest|flagship|dell marketing l\.p\.|hzardour locations', '', regex=True)
+    df['model'] = df['model'].str.replace(r'victus by hp', 'victus', regex=True)
+    df['model'] = df['model'].str.replace(r'mobile workstation|laptop|commercial notebook pc', '', regex=True)
+
+    # Reasoning: Standardise the shortening of 'generation'
+    df['model'] = df['model'].str.replace(r'generat', 'gen', regex=True)
+
+    # Reasoning: Only 1 laptop has 1 year warranty listed and so there isnt enough data
+    df['model'] = df['model'].str.replace(r'1yr', '', regex=True)
 
     # Reasoning: Only use spaces as seperation characters for consistency
     df['model'] = df['model'].str.replace(r'[(?:\s+),/\\\-_\*]', ' ', regex=True)
@@ -97,13 +106,31 @@ def normaliseModels(df):
         return row
     df = df.apply(extractOS, axis=1)
 
-    # Extract CPU brands and series
+    # Extract colours
+    # def extractColours(row):
+    #     pattern = r'()'
+    #     if re.search(pattern, str(row['model'])):
+    #         print(row['model'])
+    #         # target = 'OS'
+    #         # row[target] = regexHashMap[pattern]
+    #         # row['model'] = re.sub(pattern, ' ', str(row['model']))
+    #     return row
+    # df = df.apply(extractOS, axis=1)
 
-    # Remove the 'victus by hp'
 
-    # Extract 1yr warranty to special features
+    # Extract CPU brands and series like i5 and celeron 'inspiron i5625' 'inspiron i3000'
 
     # Extract ram and storage values and compare with existing
+
+    # Intel amd storage ram lenovo panasonic toughbook
+
+    # 'red' 'scarlet red' 'ice blue' 'space gray' 'platinum' 'midnight'
+    
+    # Remove 'pentium'
+
+    # Extract 'wifi'
+
+    # Extract 'with nvidia quadro rtx 4000 max q design'
 
 
 
