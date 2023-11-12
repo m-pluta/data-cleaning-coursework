@@ -30,14 +30,55 @@ def initialCleaning(df):
 
     return df
 
+def manuallyCleanLaptops(df):
+    problematic_models = {
+        '2022 apple macbook air m2, 16gb ram, 256gb storage - space gray (z15s000ct)': {
+            'color': 'space grey',
+            'ram': '16gb',
+            'harddisk': '256gb',
+            'cpu': 'apple m2',
+            'model': 'apple macbook air (z15s000ct)'
+        },
+        '2022 apple macbook air m2, 16gb ram, 512gb storage - midnight (z160000b1)': {
+            'color': 'midnight',
+            'ram': '16gb',
+            'harddisk': '512gb',
+            'cpu': 'apple m2',
+            'model': 'apple macbook air (z160000b1)'
+        },
+        'thinkpad p15 gen 1 with nvidia quadro rtx 4000 max-q design': {
+            'model': 'thinkpad p15 gen 1'
+        },
+        'hp 15 scarlet red': {
+            'color': 'scarlet red',         # This was verified by searching, the laptop has a red frame but silver inside
+            'model': 'hp 15'                # https://www.walmart.com/ip/HP-15-Pentium-4GB-128GB-Laptop-Scarlet-Red/307924252
+        },
+        'dell-7855-g7-512ssd': {
+            'model': 'dell 7855 g7'
+        },
+        'lenovo_i3_8gb_red': {
+            'model': 'lenovo i3 red'
+        }
+    }
+    for model, values in problematic_models.items():
+        mask = df['model'] == model
+        for column, new_value in values.items():
+            df.loc[mask, column] = new_value
+    return df
+
 def normaliseModels(df):
+    # Reasoning: Some laptops have too much unstructured data for it to be reasonable to do by automation
+    #            Hence these laptops need to be manually adjusted
+    manuallyCleanLaptops(df)
+
     # Reasoning: A laptop being a 2-in-1 or being detachable is more of a special feature. 
     #            Hence it should be extracted from the model column and placed in the special_features column
-    def extractDetachable2in1(row):
+    def extractSpecialFeatures(row):
         regexHashMap = {
             r'(detachable 2-in-1|detachable 2 in 1)': 'detachable 2-in-1',
             r'(detachable)': 'detachable',
-            r'(2 in 1|2-in-1)': '2-in-1'
+            r'(2 in 1|2-in-1)': '2-in-1',
+            r'wifi': 'wi-fi'
         }
         for pattern in regexHashMap:
             if re.search(pattern, str(row['model'])):
@@ -46,7 +87,7 @@ def normaliseModels(df):
                 row['model'] = re.sub(pattern, '', str(row['model']))
 
         return row
-    df = df.apply(extractDetachable2in1, axis=1)
+    df = df.apply(extractSpecialFeatures, axis=1)
 
     # Reasoning: Only 6 laptops contain the release year so there isn't enough data and also the release year isnt important enough info
     regexModelYear = r'(\(2021\)|\(2022\)|2021|2022|2023)'
@@ -65,7 +106,7 @@ def normaliseModels(df):
     # Reasoning: Marketing gibberish is not useful
     #            Pointless information, the dataset is about laptops
     #            A 'mobile workstation' and 'commercial notebook pc' don't offer any new information other than 'laptop'
-    df['model'] = df['model'].str.replace(r'newest|flagship|dell marketing l\.p\.|hzardour locations', '', regex=True)
+    df['model'] = df['model'].str.replace(r'newest|flagship|dell marketing l\.p\.|hzardour locations|mcafee', '', regex=True)
     df['model'] = df['model'].str.replace(r'victus by hp', 'victus', regex=True)
     df['model'] = df['model'].str.replace(r'mobile workstation|laptop|commercial notebook pc', '', regex=True)
 
@@ -106,37 +147,29 @@ def normaliseModels(df):
         return row
     df = df.apply(extractOS, axis=1)
 
-    # Extract colours
-    # def extractColours(row):
-    #     pattern = r'()'
-    #     if re.search(pattern, str(row['model'])):
-    #         print(row['model'])
-    #         # target = 'OS'
-    #         # row[target] = regexHashMap[pattern]
-    #         # row['model'] = re.sub(pattern, ' ', str(row['model']))
-    #     return row
-    # df = df.apply(extractOS, axis=1)
+    # Reasoning: The rows were manually identified and in all cases the color specified in the 'color' column was already present 
+    #            and in one case, the color was more detailed i.e. 'coral red' instead of 'red'
+    #            Duplicate data is not needed.  
+    df['model'] = df['model'].str.replace(r'\s(red|ice blue|platinum)\s?', ' ', regex=True)
 
-
-    # Extract CPU brands and series like i5 and celeron 'inspiron i5625' 'inspiron i3000'
-
-    # Extract ram and storage values and compare with existing
-
-    # Intel amd storage ram lenovo panasonic toughbook
-
-    # 'red' 'scarlet red' 'ice blue' 'space gray' 'platinum' 'midnight'
-    
-    # Remove 'pentium'
-
-    # Extract 'wifi'
-
-    # Extract 'with nvidia quadro rtx 4000 max q design'
-
-
-
-
+    # Extract ram and storage values and fill in empty existing values
+    # Reasoning: There is still some good data within the models of the laptops that could be extracted to the appropriate columns
+    def extractRAMStorageValues(row):
+        pattern = r'(?: ((?:4|8)(?:gb)?) ((?:256|500|512)(?:gb)?))'
+        if match := re.search(pattern, str(row['model'])):
+            if pd.isna(row['ram']):
+                row['ram'] = match.groups()[0]
+            if pd.isna(row['harddisk']):
+                row['harddisk'] = match.groups()[1]
+            row['model'] = re.sub(pattern, '', str(row['model']))
+        return row
+    df = df.apply(extractRAMStorageValues, axis=1)
 
     
+    # Extract CPU brands and series like 'i5' and 'celeron' 'inspiron i5625' 'inspiron i3000' 'pentium'
+
+    # 'Intel' 'amd' 'storage' 'ram' 'lenovo' 'panasonic toughbook' 'ssd'
+
 
     # Reasoning: Remove unnecessary characters from the column
     df['model'] = df['model'].replace('\s+', ' ', regex=True)
