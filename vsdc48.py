@@ -69,9 +69,33 @@ def normaliseModels(df):
     # Reasoning: Only use spaces as seperation characters for consistency
     df['model'] = df['model'].str.replace(r'[(?:\s+),/\\\-_\*]', ' ', regex=True)
 
-    # Extract D.D CPU speeds
+    # Reasoning: There are some CPU speeds in the model column that can be extracted to the appropriate column
+    def extractCPUspeed(row):
+        pattern = r'\s(\d\.\d)\s'
+        if match := re.search(pattern, str(row['model'])):
+            if pd.isna(row['cpu_speed']):
+                row['cpu_speed'] = match.groups()[0]
 
-    # Extract w7p, w10p Check if the existing OS value matches
+            row['model'] = re.sub(pattern, ' ', str(row['model']))
+        return row
+    df = df.apply(extractCPUspeed, axis=1)
+
+    # filtered_rows = df[df['model'].fillna('').str.contains(r'(w\d{1,2}[hp])', regex=True)]
+    # print(filtered_rows)
+    # Reasoning: Extract the OS version from the model, affected rows were manually checked and it overwrites
+    #            a lenovo running mac osx which is obviously bad data so it is good that it is overwritten
+    def extractOS(row):
+        regexHashMap = {
+            r'\s(w7p)\s?': 'windows 7 pro',
+            r'\s(w10p)\s?': 'windows 10 pro'
+        }
+        for pattern in regexHashMap:
+            if re.search(pattern, str(row['model'])):
+                target = 'OS'
+                row[target] = regexHashMap[pattern]
+                row['model'] = re.sub(pattern, ' ', str(row['model']))
+        return row
+    df = df.apply(extractOS, axis=1)
 
     # Extract CPU brands and series
 
