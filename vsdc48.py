@@ -82,7 +82,7 @@ def manuallyCleanLaptops(df):
             df.loc[mask, column] = new_value
     return df
 
-def normaliseModels(df):
+def standardiseModels(df):
     # Reasoning: Some laptops have too much unstructured data for it to be reasonable to do by automation
     #            Hence these laptops need to be manually adjusted
     manuallyCleanLaptops(df)
@@ -146,8 +146,6 @@ def normaliseModels(df):
         return row
     df = df.apply(extractCPUspeed, axis=1)
 
-    # filtered_rows = df[df['model'].fillna('').str.contains(r'(w\d{1,2}[hp])', regex=True)]
-    # print(filtered_rows)
     # Reasoning: Extract the OS version from the model, affected rows were manually checked and it overwrites
     #            a lenovo running mac osx which is obviously bad data so it is good that it is overwritten
     def extractOS(row):
@@ -195,6 +193,48 @@ def normaliseModels(df):
     df['model'] = df['model'].str.strip(', ')
     return df
 
+def standardiseBrands(df):
+    # Reasoning: Similar to standardisation of colours
+    brandHashMap = {
+        r".*(enovo).*": "lenovo",
+        r".*(carlisle foodservice products|best notebooks|quality refurbished computers|microtella|ctl|lpt|rokc|elo|gizpro|jtd).*": np.NaN
+    }
+    df['brand'] = df['brand'].replace(brandHashMap, regex=True)
+    return df
+
+def standardiseBrandModels(df):
+    # Reasoning: Some rows contain toughbook or latitude in their brand column even though they are model names.
+    #            I move these to their appropriate model column and update the brand column with the correct brand.
+    def standardiseToughbookLatitude(row):
+        patterns = {
+            r'(toughbook)': 'panasonic',
+            r'(latitude)': 'dell'
+        }
+        for pattern in patterns.keys():
+            if match := re.search(pattern, str(row['brand'])):
+                row['brand'] = patterns[pattern]
+
+                if match.groups()[0] not in row['model']:
+                    row['model'] = match.groups()[0] + ' ' + row['model']
+        return row
+    df = df.apply(standardiseToughbookLatitude, axis=1)
+
+    # Reasoning: I remove all instances of the brand occurring in the model column.
+    #            This is redundant data and serves no purpose
+    def removeBrandFromModel(row):
+        if not pd.isna(row['model']) and not pd.isna(row['brand']):
+            if row['brand'] in row['model']:
+                row['model'] = row['model'].replace(row['brand'], '')
+        return row
+    df = df.apply(removeBrandFromModel, axis=1)
+
+    # Reasoning: Remove all rows that do not contain any information in their model column
+    #            This is indicated by either an empty string or NaN value
+    df['model'].replace(r'^$', pd.NA, regex=True, inplace=True)
+    df.dropna(subset=['model'], inplace=True)
+
+    return df
+
 def standardiseColours(df):
     # Reasoning: Reduces variability in the dataset due to misspellings, variations and interpretations
     #            Reducuing the variability also helps with categorization which is use for data exploration and visualization
@@ -214,18 +254,6 @@ def standardiseColours(df):
         # r".*(information not available|rgb backlit|touchscreen|evo i7-1260p|acronym).*": np.NaN #TODO extract information from here
     }
     df['color'] = df['color'].replace(colorHashMap, regex=True)
-
-    return df
-
-def standardiseBrands(df):
-    # Reasoning: Similar to standardisation of colours
-    brandHashMap = {
-        r".*(enovo).*": "lenovo",
-        r".*(carlisle foodservice products|best notebooks|computer upgrade king|quality refurbished computers|microtella|ctl|lpt|rokc|elo|gizpro|jtd).*": np.NaN,
-        # r".*(toughbook).*": "panasonic", #TODO move toughbook to the model later
-        # r".*(latitude).*": "dell" #TODO ensure all latitude dells have dell as brand and latitude as model
-    }
-    df['brand'] = df['brand'].replace(brandHashMap, regex=True)
 
     return df
 
@@ -356,7 +384,7 @@ if __name__ == "__main__":
     #                  cleanScreensPrices, convertRamDiskSizesToGB, standardiseOS, 
     #                  normaliseCPUSpeeds, renameColumns]
 
-    function_calls = [initialCleaning, normaliseModels]
+    function_calls = [initialCleaning, standardiseModels, standardiseBrands, standardiseBrandModels]
     df = pd.read_excel('amazon_laptop_2023.xlsx')
 
     for function in function_calls:
@@ -366,7 +394,7 @@ if __name__ == "__main__":
 
     ### TESTING ###
 
-    # print("Total rows: ", df.shape[0])
+    print("Total rows: ", df.shape[0])
     # print(df.dtypes)
     printNumEmpty(df)
 
