@@ -58,6 +58,22 @@ def manuallyCleanLaptops(df):
         },
         'lenovo_i3_8gb_red': {
             'model': 'lenovo i3 red'
+        },
+        'hp pavilion i7-1065g7 fhd touch': {
+            'cpu': 'core i7 1065g7',
+            'model': 'hp pavilion fhd touch'
+        },
+        'tp l15,w10p,i5,8gb,256gb,1yr': {
+            'cpu': '1.2ghz i5 cortex a8 processor',
+            'model': 'tp l15,w10p,8gb,256gb,1yr'
+        },
+        'amd ryzen 5': {
+            'cpu': 'amd ryzen 5',
+            'model': ''
+        },
+        'amd athlon': {
+            'cpu': 'amd athlon',
+            'model': ''
         }
     }
     for model, values in problematic_models.items():
@@ -165,11 +181,14 @@ def normaliseModels(df):
         return row
     df = df.apply(extractRAMStorageValues, axis=1)
 
-    
-    # Extract CPU brands and series like 'i5' and 'celeron' 'inspiron i5625' 'inspiron i3000' 'pentium'
+    # Delete all intel cpu details from model column
+    # Reasoning: The cpu column already contains this information in every instance
+    pattern = r'((?:intel core )?(i[357])\b)'
+    df['model'] = df['model'].str.replace(pattern, '', regex=True)
+    df['model'] = df['model'].str.replace(r'intel|pentium', '', regex=True)
 
-    # 'Intel' 'amd' 'storage' 'ram' 'lenovo' 'panasonic toughbook' 'ssd'
-
+    pattern = r'ryzen edition|amd'
+    df['model'] = df['model'].str.replace(pattern, '', regex=True)
 
     # Reasoning: Remove unnecessary characters from the column
     df['model'] = df['model'].replace('\s+', ' ', regex=True)
