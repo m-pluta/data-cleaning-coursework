@@ -354,6 +354,7 @@ def standardiseRAMHarddisk(df):
 
 def standardiseOS(df):
     # Convert os systems to standard systems
+    # Reasoning: Removes unnecessary details and simplifies the OSs to simplistic values
     osHashMap = {
         r".*(10 pro).*": "windows 10 pro",
         r".*(11 pro).*": "windows 11 pro",
@@ -361,10 +362,10 @@ def standardiseOS(df):
         r".*(windows 11 home|win 11 multi-home).*": "windows 11 home",
         r'.*(windows 11 s).*': 'windows 11',
         r".*(windows 7 professional).*": "windows 7 pro",
-        r'.*(windows 7 home).*': 'windows 7 home',
+        r'.*(windows 7 home).*': 'windows 7',
         r'.*(windows pro).*': 'windows',
-        r'macos 10.12 sierra': 'macos sierra',
-        r'macos 12 monterey': 'macos monterey',
+        r'.*(macos 10.12 sierra).*': 'mac os sierra',
+        r'.*(macos 12 monterey).*': 'mac os monterey',
         r'.*(unknown|no).*': np.NaN
     }
     df['OS'] = df['OS'].replace(osHashMap, regex=True)
@@ -383,7 +384,7 @@ def normaliseCPUSpeeds(df):
             if value > 10:
                 value /= 1000
             return value
-  
+
     df['cpu_speed'] = df['cpu_speed'].apply(normaliseCPU)
 
     return df
