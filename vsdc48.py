@@ -30,19 +30,19 @@ def initialCleaning(df):
 
     return df
 
-def manuallyCleanLaptops(df):
+def manuallyCleanModels(df):
     problematic_models = {
         '2022 apple macbook air m2, 16gb ram, 256gb storage - space gray (z15s000ct)': {
-            'color': 'space grey',
-            'ram': '16gb',
-            'harddisk': '256gb',
+            'color': 'space gray',
+            'ram': '16 gb',
+            'harddisk': '256 gb',
             'cpu': 'apple m2',
             'model': 'apple macbook air (z15s000ct)'
         },
         '2022 apple macbook air m2, 16gb ram, 512gb storage - midnight (z160000b1)': {
             'color': 'midnight',
-            'ram': '16gb',
-            'harddisk': '512gb',
+            'ram': '16 gb',
+            'harddisk': '512 gb',
             'cpu': 'apple m2',
             'model': 'apple macbook air (z160000b1)'
         },
@@ -85,7 +85,7 @@ def manuallyCleanLaptops(df):
 def standardiseModels(df):
     # Reasoning: Some laptops have too much unstructured data for it to be reasonable to do by automation
     #            Hence these laptops need to be manually adjusted
-    manuallyCleanLaptops(df)
+    manuallyCleanModels(df)
 
     # Reasoning: A laptop being a 2-in-1 or being detachable is more of a special feature. 
     #            Hence it should be extracted from the model column and placed in the special_features column
@@ -235,12 +235,38 @@ def standardiseBrandModels(df):
 
     return df
 
-def standardiseColours(df):
+def manuallyCleanColors(df):
+    problematic_colors = {
+        'rgb backlit': {
+            'special_features': 'rgb backlit keyboard'
+        },
+        'touchscreen': {
+            'special_features': 'touchscreen'
+        },
+        'evo i7-1260p': {
+            'cpu': 'evo i7-1260p'
+        }
+    }
+    for color, values in problematic_colors.items():
+        mask = df['color'] == color
+        for column, new_value in values.items():
+            df.loc[mask, column] = new_value
+        df.loc[mask, 'color'] = np.NaN
+    return df
+
+def standardiseColors(df):
+    manuallyCleanColors(df)
+
     # Reasoning: Reduces variability in the dataset due to misspellings, variations and interpretations
     #            Reducuing the variability also helps with categorization which is use for data exploration and visualization
     #            A part of this process also ensures contextual standardization which is crucial where colours are named uniquely 
     #            for marketing or specific contexts (e.g. thunder black or platinum titan)
+    #            Need to first handle the cases that contain multiple conflicting standard colours
     colorHashMap = {
+        r".*(information not available|acronym).*": np.NaN,             #TODO Need to justify these
+        r'titanium blue-black-dark blue-black|black/white': 'black',    #
+        r'cover: red ; inner/keyboard: black': 'red',                   #
+        r'ice blue \+ iron grey': 'grey',                               #TODO
         r".*(silver|sliver|aluminum|platinum|light titan|platinum titan).*": "silver",
         r".*(black|dark side of the moon|thunder balck|carbon fiber).*": "black",
         r".*(white).*": "white",
@@ -248,22 +274,21 @@ def standardiseColours(df):
         r".*(red).*": "red",
         r".*(blue|cobalt|sky|dark teal|apollo|midnight).*": "blue",
         r".*(green|sage|soft mint|dark moss).*": "green",
+        r".*(punk pink|electro punk|rose gold).*": "pink",
         r".*(gold).*": "gold",
-        r".*(almond|beige mousse|lunar light|dune).*": "beige", #TODO Need to justify this
-        r".*(punk pink|electro punk).*": "pink",
-        # r".*(information not available|rgb backlit|touchscreen|evo i7-1260p|acronym).*": np.NaN #TODO extract information from here
+        r".*(almond|beige mousse|lunar light|dune).*": "beige"          #TODO Need to justify this
     }
     df['color'] = df['color'].replace(colorHashMap, regex=True)
 
     return df
 
-def extract_numerical_value(price):
-    if pd.isna(price):
-        return np.nan
-    numerical_value = re.search(r'\d+(\.\d+)?', price.replace(",", "")).group()
-    return float(numerical_value)
-
 def cleanScreensPrices(df):
+    def extract_numerical_value(price):
+        if pd.isna(price):
+            return np.nan
+        numerical_value = re.search(r'\d+(\.\d+)?', price.replace(",", "")).group()
+        return float(numerical_value)
+    
     # Remove 'inches' from screen sizes and '$' from prices. Convert these values to floats
     # Reasoning: Removing 'inches' and '$' allows the values to be converted from a categorical string type to a continuous scale.
     #            This allows for better data visualisation.
@@ -273,69 +298,78 @@ def cleanScreensPrices(df):
 
 def convert_to_gb(size, tb_possible = False):
     # TODO check the correctness of this function, especially with NaNs
-    size = str(size)
-
     if pd.isna(size): # Check for NaN
-        return size
-    
+        return np.NaN
+
+    if not isinstance(size, str):
+        return round(float(size))
+
     if size.endswith('tb'):
-        return round(float(size.replace(' tb', '')) * 1000)
+        return round(float(size.replace('tb', '')) * 1000)
     
     if size.endswith('gb'):
-        return round(float(size.replace(' gb', '')))
+        return round(float(size.replace('gb', '')))
     
     elif size.endswith('mb'):
-        return round(float(size.replace(' mb', '')))
+        return round(float(size.replace('mb', '')))
     else:
         if tb_possible and float(size) < 16:
             return float(size) * 1000
         else: 
             return float(size)
 
-def convertRamDiskSizesToGB(df):
+def standardiseRAMHarddisk(df):
     # Adjust harddisk sizes to be more consistent
     df['harddisk'] = df['harddisk'].apply(convert_to_gb, tb_possible=True)
     df['ram'] = df['ram'].apply(convert_to_gb, tb_possible=False)
 
     return df
 
-def bucketStorageSize(size: int) -> int:
-    if pd.isna(size):
-        return size
+# def bucketStorageSize(size: int) -> int:
+#     if pd.isna(size):
+#         return size
     
-    if size in (64, 65):
-        return 64
-    if size in (120, 128):
-        return 128
-    if size in (240, 250, 256):
-        return 256
-    if size in (480, 500, 512):
-        return 512
-    if size in (1000, 1024):
-        return 1024
-    if size in (2000, 2048):
-        return 2048
-    if size in (4000, 4096):
-        return 4096
-    if size in (8000, 8192):
-        return 8192
+#     if size in (64, 65):
+#         return 64
+#     if size in (120, 128):
+#         return 128
+#     if size in (240, 250, 256):
+#         return 256
+#     if size in (480, 500, 512):
+#         return 512
+#     if size in (1000, 1024):
+#         return 1024
+#     if size in (2000, 2048):
+#         return 2048
+#     if size in (4000, 4096):
+#         return 4096
+#     if size in (8000, 8192):
+#         return 8192
 
-    return size
-def bucketHardDisk(df):
-    df['harddisk'] = df['harddisk'].apply(bucketStorageSize)
+#     return size
+# def bucketHardDisk(df):
+#     df['harddisk'] = df['harddisk'].apply(bucketStorageSize)
 
-    return df
+#     return df
 
 def standardiseOS(df):
     # Convert os systems to standard systems
     osHashMap = {
-        r".*(windows 10 pro|win 10 pro).*": "windows 10 pro",
-        r".*(windows 11 pro).*": "windows 11 pro",
+        r".*(10 pro).*": "windows 10 pro",
+        r".*(11 pro).*": "windows 11 pro",
         r".*(windows 10|win 10).*": "windows 10 home",
         r".*(windows 11 home|win 11 multi-home).*": "windows 11 home",
-        r".*(windows 7 professional).*": "windows 7 pro"
+        r'.*(windows 11 s).*': 'windows 11',
+        r".*(windows 7 professional).*": "windows 7 pro",
+        r'.*(windows 7 home).*': 'windows 7 home',
+        r'.*(windows pro).*': 'windows',
+        r'macos 10.12 sierra': 'macos sierra',
+        r'macos 12 monterey': 'macos monterey',
+        r'.*(unknown|no).*': np.NaN
     }
     df['OS'] = df['OS'].replace(osHashMap, regex=True)
+
+    df = df[df['OS'] != 'hp thinpro']
 
     return df
 
@@ -380,11 +414,8 @@ def printNumEmpty(df):
         print(str(nulls[column]).rjust(7), end="\n")
 
 if __name__ == "__main__":
-    # function_calls = [initialCleaning, normaliseModels, standardiseColours, standardiseBrands, 
-    #                  cleanScreensPrices, convertRamDiskSizesToGB, standardiseOS, 
-    #                  normaliseCPUSpeeds, renameColumns]
-
-    function_calls = [initialCleaning, standardiseModels, standardiseBrands, standardiseBrandModels]
+    # normaliseCPUSpeeds, renameColumns
+    function_calls = [initialCleaning, standardiseModels, standardiseBrands, standardiseBrandModels, standardiseColors, cleanScreensPrices, standardiseRAMHarddisk, standardiseOS]
     df = pd.read_excel('amazon_laptop_2023.xlsx')
 
     for function in function_calls:
@@ -397,6 +428,8 @@ if __name__ == "__main__":
     print("Total rows: ", df.shape[0])
     # print(df.dtypes)
     printNumEmpty(df)
+
+    print(Counter(df['OS']))
 
     # # Most common words in the model column
     # myCounter = Counter(' '.join(df['model'].astype(str).apply(lambda x: ' '.join([word for word in x.split() if not word.isdigit()]))).split())
