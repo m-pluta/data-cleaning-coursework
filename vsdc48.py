@@ -374,6 +374,116 @@ def standardiseOS(df):
 
     return df
 
+def manuallyCleanCPU(df):
+    df['cpu'] = df['cpu'].str.replace(r'_|-', ' ', regex=True)
+
+    def extractCPUspeed(row):
+        pattern = r'(?: ?(?P<cpu_speed>\d\.\d) ?ghz ?)'
+        if match := re.search(pattern, str(row['cpu'])):
+            if match.groupdict().get('cpu_speed'):
+                row['cpu_speed'] = match.group('cpu_speed')
+                row['cpu'] = re.sub(pattern, '', str(row['cpu']))
+        return row
+    df = df.apply(extractCPUspeed, axis=1)
+
+    problematic_cpus = {
+        'a series dual core a4 3300m': {
+            'cpu_brand': 'amd',
+            'cpu_series': 'a4',
+            'cpu_model': '3300m'
+        },
+        'evo i7 1260p': {
+            'cpu_brand': 'intel',
+            'cpu_series': 'evo i7',
+            'cpu_model': '1260p'
+        }, 
+        'intel core i7 extreme': {
+            'cpu_brand': 'intel',
+            'cpu_series': 'i7',
+            'cpu_model': 'extreme'
+        },
+        'arm 7100': {
+            'cpu_brand': 'arm',
+            'cpu_series': '7100',
+            'cpu_model': np.NaN
+        }, 
+        'atom z8350': {
+            'cpu_brand': 'intel',
+            'cpu_series': 'atom',
+            'cpu_model': 'z8350'
+        }
+    }
+    for model, values in problematic_cpus.items():
+        mask = df['cpu'] == model
+        for column, new_value in values.items():
+            df.loc[mask, column] = new_value
+            df.loc[mask, 'cpu'] = np.NaN
+
+    return df
+
+def standardiseCPU(df):
+    cpu_column_index = df.columns.get_loc('cpu')
+    df.insert(cpu_column_index + 1, 'cpu_brand', np.NaN, False)
+    df.insert(cpu_column_index + 2, 'cpu_series', np.NaN, False)
+    df.insert(cpu_column_index + 3, 'cpu_model', np.NaN, False)
+    df['cpu_brand'] = df['cpu_brand'].astype(str)
+    df['cpu_series'] = df['cpu_series'].astype(str)
+    df['cpu_model'] = df['cpu_model'].astype(str)
+
+    df = manuallyCleanCPU(df)
+
+    def extractCPUdetails(row):
+        brandPatterns = {
+            'intel': {
+                r'^(?:intel )?core (?P<cpu_series>i[3579])(?: family)?$',
+                r'^(?:intel )?core\s?(?P<cpu_series>i[3579])(?:[ -])(?P<cpu_model>(?:\d{3,5}(?:[uthxyqmk]{1,2}))|(?:\d{4}g\d))$',
+                r'^(?:intel )?(?:(?P<cpu_series>celeron|pentium)\s?)(?P<cpu_model>[np]\d{4}|\d{4}u|n|d|4|other)?$',
+                r'^(?:intel )?(?:(?P<cpu_series>mobile) cpu)$',
+                r'^(?:intel )?(?P<cpu_series>atom|xeon)$',
+                r'(?:intel )?(?P<cpu_series>core m\d?)(?: (?P<cpu_model>8100y|5y10))?',
+                r'^(?P<cpu_series>8032)$',
+                r'(?:intel )?(?P<cpu_series>core(?: \d)?)(?: (?P<cpu_model>duo(?: p\d{4})?))?'
+            },
+            'amd': {
+                r'^(?:amd )?(?P<cpu_series>ryzen\s?[3579])(?:\s(?P<cpu_model>\d{4}[hux]))?$',
+                r'(?:amd )?(?:kabini )?(?P<cpu_series>[ar] series|a\d{1,2})(?: (?P<cpu_model>\d{4}[km]))?',
+                r'^(?P<cpu_series>athlon(?: silver)?)(?:\s(?P<cpu_model>\d{4}u))?$',
+                r'(?P<cpu_series>cortex)(?: (?P<cpu_model>a\d{1,2}))?',
+            },
+            'mediatek': {
+                r'^(?:mediatek)[ _](?P<cpu_model>.*)$',
+            },
+            'apple': {
+                r'^(?:apple )(?P<cpu_model>m[12])?$',
+            },
+            'snapdragon': {
+                r'^snapdragon$',
+            },
+            'motorola': {
+                r'^(?P<cpu_series>68000)$',
+            },
+            np.NaN: {
+                r'^unknown|others$',
+            }
+        }
+        for brand, patterns in brandPatterns.items():
+            for pattern in patterns:
+                if match := re.search(pattern, str(row['cpu'])):
+                    row['cpu_brand'] = brand
+
+                    if match.groupdict().get('cpu_series'):
+                        row['cpu_series'] = match.group('cpu_series')
+
+                    if match.groupdict().get('cpu_model'):
+                        row['cpu_model'] = match.group('cpu_model')
+                        
+                    row['cpu'] = np.NaN
+        return row
+    
+    df = df.apply(extractCPUdetails, axis=1)
+    df = df.drop(columns=['cpu'])
+    return df
+
 def normaliseCPUSpeeds(df):
     # Adjust CPU speeds to be more consistent with the same units
     def normaliseCPU(cpu_speed):
@@ -416,7 +526,10 @@ def printNumEmpty(df):
 
 if __name__ == "__main__":
     # normaliseCPUSpeeds, renameColumns
-    function_calls = [initialCleaning, standardiseModels, standardiseBrands, standardiseBrandModels, standardiseColors, cleanScreensPrices, standardiseRAMHarddisk, standardiseOS]
+    function_calls = [initialCleaning, standardiseModels, standardiseBrands, 
+                      standardiseBrandModels, standardiseColors, cleanScreensPrices, 
+                      standardiseRAMHarddisk, standardiseOS, standardiseCPU]
+    
     df = pd.read_excel('amazon_laptop_2023.xlsx')
 
     for function in function_calls:
@@ -427,10 +540,10 @@ if __name__ == "__main__":
     ### TESTING ###
 
     print("Total rows: ", df.shape[0])
-    # print(df.dtypes)
+    print("".join(['-'] * 70))
+    print(df.dtypes)
+    print("".join(['-'] * 70))
     printNumEmpty(df)
-
-    print(Counter(df['OS']))
 
     # # Most common words in the model column
     # myCounter = Counter(' '.join(df['model'].astype(str).apply(lambda x: ' '.join([word for word in x.split() if not word.isdigit()]))).split())
