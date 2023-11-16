@@ -197,9 +197,28 @@ def standardiseBrands(df):
     # Reasoning: Similar to standardisation of colours
     brandHashMap = {
         r".*(enovo).*": "lenovo",
-        r".*(carlisle foodservice products|best notebooks|quality refurbished computers|microtella|ctl|lpt|rokc|elo|gizpro|jtd).*": np.NaN
+        r".*(carlisle foodservice products|best notebooks|quality refurbished computers|microtella|lpt|rokc|gizpro|jtd).*": None
     }
     df['brand'] = df['brand'].replace(brandHashMap, regex=True)
+
+    # After removing the resellers from the brand column, the correct brands are then attempted to be recovered
+    def recoverBrands(model):
+        correctBrands = {
+        'dell inspiron': 'dell',
+        'asus vivobook l203': 'asus',
+        'latitude': 'dell',
+        'hp elitebook': 'hp',
+        'e6520': 'dell',
+        'precision 5770': 'dell',
+        'ideapad 3': 'lenovo',
+        'lenovo thinkpad': 'lenovo',
+        'thinkpad l13 yoga': 'lenovo'
+        }
+        return correctBrands.get(model, np.NaN)
+
+    mask = df['brand'].isnull()
+    df.loc[mask, 'brand'] = df.loc[mask, 'model'].apply(recoverBrands)
+
     return df
 
 def standardiseBrandModels(df):
@@ -426,9 +445,6 @@ def standardiseCPU(df):
     df.insert(cpu_column_index + 1, 'cpu_brand', np.NaN, False)
     df.insert(cpu_column_index + 2, 'cpu_series', np.NaN, False)
     df.insert(cpu_column_index + 3, 'cpu_model', np.NaN, False)
-    df['cpu_brand'] = df['cpu_brand'].astype(str)
-    df['cpu_series'] = df['cpu_series'].astype(str)
-    df['cpu_model'] = df['cpu_model'].astype(str)
 
     df = manuallyCleanCPU(df)
 
@@ -437,7 +453,7 @@ def standardiseCPU(df):
             'intel': {
                 r'^(?:intel )?core (?P<cpu_series>i[3579])(?: family)?$',
                 r'^(?:intel )?core\s?(?P<cpu_series>i[3579])(?:[ -])(?P<cpu_model>(?:\d{3,5}(?:[uthxyqmk]{1,2}))|(?:\d{4}g\d))$',
-                r'^(?:intel )?(?:(?P<cpu_series>celeron|pentium)\s?)(?P<cpu_model>[np]\d{4}|\d{4}u|n|d|4|other)?$',
+                r'^(?:intel )?(?:(?P<cpu_series>celeron|pentium)\s?)(?P<cpu_model>[np]\d{4}|\d{4}u|n|d|4)?$',
                 r'^(?:intel )?(?:(?P<cpu_series>mobile) cpu)$',
                 r'^(?:intel )?(?P<cpu_series>atom|xeon)$',
                 r'(?:intel )?(?P<cpu_series>core m\d?)(?: (?P<cpu_model>8100y|5y10))?',
@@ -510,8 +526,8 @@ def renameColumns(df):
     }
     return df.rename(columns=columnNameHashMap)
 
-def outputDataToFile(df):
-    df.to_excel(OUT_FILEPATH, index=False)  # index=False to exclude the index column in the output file
+def outputDataToFile(df, path):
+    df.to_excel(path, index=False)  # index=False to exclude the index column in the output file
 
 def printNumEmpty(df):
     emptyStrings = df.eq('').sum()
@@ -535,7 +551,7 @@ if __name__ == "__main__":
     for function in function_calls:
         df = function(df)
 
-    outputDataToFile(df)
+    outputDataToFile(df, OUT_FILEPATH)
 
     ### TESTING ###
 
@@ -546,6 +562,10 @@ if __name__ == "__main__":
     printNumEmpty(df)
 
     # # Most common words in the model column
-    # myCounter = Counter(' '.join(df['model'].astype(str).apply(lambda x: ' '.join([word for word in x.split() if not word.isdigit()]))).split())
+
+    # all = []
+    # for index, value in df.iterrows():
+    #     all += str(value['special_features']).split(',')
+    # myCounter = Counter(all)
     # for el, count in myCounter.most_common():
     #     print(f"{el}: {count}")
