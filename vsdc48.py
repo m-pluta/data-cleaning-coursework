@@ -522,15 +522,13 @@ def standardiseSpecialFeatures(df):
             r'chiclet': 'chiclet keyboard',
             r'alexa': 'amazon alexa',
             r'corning gorilla glass': 'corning gorilla glass',
-            r'water proof|water resistant': 'water resistant',
+            r'water proof|water resistant': 'water-resistant',
             r'lightweight|light and compact design': 'lightweight',
             r'killer wifi 6e': 'wifi',
             r'touch ?screen': 'touchscreen',
             r'anti-ghost key': 'anti-ghost keys',
             r'keypad': 'numeric keypad',
-            r'^hd$|work|create|and play on a fast|alcohol-free|multitasking & privacy|^keyboard$|information not available': np.NaN,
-            r'dishwasher safe|high quality|portable|1.5mm key-travel|built for entertainment|space saving': np.NaN,
-            r'32 gb ram|windows laptop|i5 laptop|intel 9560 jefferson': np.NaN
+            r'bluetooth|memory card slot|2-in-1|trackpoint|anti-smudge|miracast|microphone|security slot|camera|detachable|144hz refresh rate|ergonomic': '_KEEP_'
         }
 
         #Split original rows based on commas and remove all leading and trailing whitespace
@@ -539,10 +537,17 @@ def standardiseSpecialFeatures(df):
 
         # Apply each regex to each feature listed in the row
         for idx, feature in enumerate(stripped_features):
-            for pattern in patterns:
+            changedOrKept = False
+            for pattern, mapped_value in patterns.items():
                 if re.search(pattern, feature):
-                    stripped_features[idx] = patterns[pattern]
+                    if mapped_value == '_KEEP_':
+                        changedOrKept = True
+                        break
+                    stripped_features[idx] = mapped_value
+                    changedOrKept = True
                     break
+            if not changedOrKept:
+                stripped_features[idx] = np.NaN
 
         # Remove all empty string and NaN from the special features
         stripped_features = [feature for feature in stripped_features if (feature != '' and not pd.isna(feature))]
@@ -624,10 +629,10 @@ if __name__ == "__main__":
     printNumEmpty(df)
 
     # # Most common words in the special features column
-    print("".join(['-'] * 70))
-    all = []
-    for index, value in df.iterrows():
-        all += [val.strip() for val in str(value['special_features']).split(',')]
-    myCounter = Counter(all)
-    for el, count in myCounter.most_common():
-        print(f"{el}: {count}")
+    # print("".join(['-'] * 70))
+    # all = []
+    # for index, value in df.iterrows():
+    #     all += [val.strip() for val in str(value['special_features']).split(',')]
+    # myCounter = Counter(all)
+    # for el, count in myCounter.most_common():
+    #     print(f"{el}: {count}")
