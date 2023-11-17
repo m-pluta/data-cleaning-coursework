@@ -251,7 +251,7 @@ def standardiseBrandModels(df):
     #            This is indicated by either an empty string or NaN value
     df['model'].replace(r'^$', pd.NA, regex=True, inplace=True)
     df.dropna(subset=['model'], inplace=True)
-
+    df['model'] = df['model'].str.strip()
     return df
 
 def manuallyCleanColors(df):
@@ -581,6 +581,11 @@ def standardiseCPUSpeeds(df):
     df['cpu_speed'] = df['cpu_speed'].apply(normaliseCPU)
 
     return df
+
+def standardiseGPU(df):
+
+    return df
+
 
 def renameColumns(df):
     columnNameHashMap = {
