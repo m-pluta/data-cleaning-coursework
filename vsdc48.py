@@ -500,7 +500,69 @@ def standardiseCPU(df):
     df = df.drop(columns=['cpu'])
     return df
 
-def normaliseCPUSpeeds(df):
+def standardiseSpecialFeatures(df):
+    df['special_features'] = df['special_features'].replace(r'wifi & bluetooth', 'wifi,bluetooth', regex=True)
+
+    def enumSpecialFeatures(row):
+        if pd.isna(row['special_features']):
+            return row
+        
+        patterns = {
+            r'(anti-? ?(?:gla(?:re)?)|reflection)': 'anti-glare',
+            r'fingerprint': 'fingerprint sensor',
+            r'bezel|(?:infinity|nano)edge|narrow': 'thin bezel',
+            r'backli(?:gh)?t': 'backlit keyboard',
+            r'^(?:stylus )?pen$|active stylus': 'stylus',
+            r'(?:high definition|hd) audio': 'hd audio',
+            r'support stylus': 'stylus support',
+            r'dolby': 'dolby audio',
+            r'spill[ -]resistant': 'spill-resistant',
+            r'stereo|speakers': 'stereo speakers',
+            r'multi[ -]touch': 'multi-touch',
+            r'chiclet': 'chiclet keyboard',
+            r'alexa': 'amazon alexa',
+            r'corning gorilla glass': 'corning gorilla glass',
+            r'water proof|water resistant': 'water resistant',
+            r'lightweight|light and compact design': 'lightweight',
+            r'killer wifi 6e': 'wifi',
+            r'touch ?screen': 'touchscreen',
+            r'anti-ghost key': 'anti-ghost keys',
+            r'keypad': 'numeric keypad',
+            r'^hd$|work|create|and play on a fast|alcohol-free|multitasking & privacy|^keyboard$|information not available': np.NaN,
+            r'dishwasher safe|high quality|portable|1.5mm key-travel|built for entertainment|space saving': np.NaN,
+            r'32 gb ram|windows laptop|i5 laptop|intel 9560 jefferson': np.NaN
+        }
+
+        #Split original rows based on commas and remove all leading and trailing whitespace
+        features_split = str(row['special_features']).split(',')
+        stripped_features = [feature.strip() for feature in features_split]
+
+        # Apply each regex to each feature listed in the row
+        for idx, feature in enumerate(stripped_features):
+            for pattern in patterns:
+                if re.search(pattern, feature):
+                    stripped_features[idx] = patterns[pattern]
+                    break
+
+        # Remove all empty string and NaN from the special features
+        stripped_features = [feature for feature in stripped_features if (feature != '' and not pd.isna(feature))]
+
+        # Turn into set to remove duplicates, convert back to list, sort the list
+        # Reasoning: Sorting the list will be helpful later when checking for duplicate 
+        #            laptops that just had their special features in different orders.
+        stripped_features = sorted(list(set(stripped_features)))
+
+        # Convert the list of features back into comma seperated strings
+        # Lists containing no features are mapped to NaN
+        row['special_features'] = ",".join(stripped_features) if len(stripped_features) > 0 else np.NaN
+
+        return row
+
+    df = df.apply(enumSpecialFeatures, axis=1)
+
+    return df
+
+def standardiseCPUSpeeds(df):
     # Adjust CPU speeds to be more consistent with the same units
     def normaliseCPU(cpu_speed):
         cpu_speed = str(cpu_speed)
@@ -541,10 +603,10 @@ def printNumEmpty(df):
         print(str(nulls[column]).rjust(7), end="\n")
 
 if __name__ == "__main__":
-    # normaliseCPUSpeeds, renameColumns
     function_calls = [initialCleaning, standardiseModels, standardiseBrands, 
                       standardiseBrandModels, standardiseColors, cleanScreensPrices, 
-                      standardiseRAMHarddisk, standardiseOS, standardiseCPU]
+                      standardiseRAMHarddisk, standardiseOS, standardiseCPU, 
+                      standardiseSpecialFeatures, standardiseCPUSpeeds, renameColumns]
     
     df = pd.read_excel('amazon_laptop_2023.xlsx')
 
@@ -561,11 +623,11 @@ if __name__ == "__main__":
     print("".join(['-'] * 70))
     printNumEmpty(df)
 
-    # # Most common words in the model column
-
-    # all = []
-    # for index, value in df.iterrows():
-    #     all += str(value['special_features']).split(',')
-    # myCounter = Counter(all)
-    # for el, count in myCounter.most_common():
-    #     print(f"{el}: {count}")
+    # # Most common words in the special features column
+    print("".join(['-'] * 70))
+    all = []
+    for index, value in df.iterrows():
+        all += [val.strip() for val in str(value['special_features']).split(',')]
+    myCounter = Counter(all)
+    for el, count in myCounter.most_common():
+        print(f"{el}: {count}")
