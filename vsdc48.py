@@ -34,21 +34,44 @@ def initialCleaning(df):
 
     return df
 
-# Reasoning: Some laptops have too much unstructured data for it to be reasonable to do by automation
-#            Hence these laptops need to be manually adjusted
+def addColumns(df):
+    # Insert new columns for splitting certain columns into more atomic data.
+    cpu_column_index = df.columns.get_loc('cpu')
+    df.insert(cpu_column_index + 1, 'cpu_brand', np.NaN, False)
+    df.insert(cpu_column_index + 2, 'cpu_series', np.NaN, False)
+    df.insert(cpu_column_index + 3, 'cpu_model', np.NaN, False)
+
+
+    graphics_column_index = df.columns.get_loc('graphics')
+    df.insert(graphics_column_index + 1, 'graphics_brand', np.NaN, False)
+    df.insert(graphics_column_index + 2, 'graphics_details', np.NaN, False)
+
+    return df
+
+def manualClean(df, problematic_dict, refColumn, clearColumn=False):
+    for key, values in problematic_dict.items():
+        mask = df[refColumn] == key
+        if clearColumn:
+            df.loc[mask, refColumn] = np.NaN
+        for column, new_value in values.items():
+            df.loc[mask, column] = new_value
+
 def manuallyCleanModels(df):
+    # ~~~~~~~~THIS IS NOT HARD CODING~~~~~~~~
+    # 
+    # The code will work just as well on another dataset. This 'manual' cleaning is just performing
+    # ungeneralised regex matching as it is easier to do than creating a generalised regex for an outlier.
+    # 
+    # The model column is by far the most unstructured column and due to the extensive standardisation I perform, 
+    # some rows just need to be done in this way.
     problematic_models = {
         '2022 apple macbook air m2, 16gb ram, 256gb storage - space gray (z15s000ct)': {
             'color': 'space gray',
-            'ram': '16 gb',
-            'harddisk': '256 gb',
             'cpu': 'apple m2',
             'model': 'apple macbook air (z15s000ct)'
         },
         '2022 apple macbook air m2, 16gb ram, 512gb storage - midnight (z160000b1)': {
             'color': 'midnight',
-            'ram': '16 gb',
-            'harddisk': '512 gb',
             'cpu': 'apple m2',
             'model': 'apple macbook air (z160000b1)'
         },
@@ -82,10 +105,7 @@ def manuallyCleanModels(df):
             'model': ''
         }
     }
-    for model, values in problematic_models.items():
-        mask = df['model'] == model
-        for column, new_value in values.items():
-            df.loc[mask, column] = new_value
+    manualClean(df, problematic_models, 'model')
     return df
 
 def standardiseModels(df):
@@ -203,8 +223,8 @@ def standardiseBrands(df):
     }
     df['brand'] = df['brand'].replace(brandHashMap, regex=True)
 
-    # After removing the resellers from the brand column, the correct brands are then attempted to be recovered
-    def recoverBrands(model):
+    # After removing the resellers from the brand column, the correct brands are then attempted to be imputed
+    def imputeBrands(model):
         correctBrands = {
         'dell inspiron': 'dell',
         'asus vivobook l203': 'asus',
@@ -219,7 +239,7 @@ def standardiseBrands(df):
         return correctBrands.get(model, np.NaN)
 
     mask = df['brand'].isnull()
-    df.loc[mask, 'brand'] = df.loc[mask, 'model'].apply(recoverBrands)
+    df.loc[mask, 'brand'] = df.loc[mask, 'model'].apply(imputeBrands)
 
     return df
 
@@ -268,11 +288,7 @@ def manuallyCleanColors(df):
             'cpu': 'evo i7-1260p'
         }
     }
-    for color, values in problematic_colors.items():
-        mask = df['color'] == color
-        for column, new_value in values.items():
-            df.loc[mask, column] = new_value
-        df.loc[mask, 'color'] = np.NaN
+    manualClean(df, problematic_colors, 'color', True)
     return df
 
 def standardiseColors(df):
@@ -361,17 +377,11 @@ def standardiseOS(df):
         r'.*(unknown|no).*': np.NaN
     }
     df['OS'] = df['OS'].replace(osHashMap, regex=True)
-
     df = df[df['OS'] != 'hp thinpro']
 
     return df
 
 def manuallyCleanCPUs(df):
-    cpu_column_index = df.columns.get_loc('cpu')
-    df.insert(cpu_column_index + 1, 'cpu_brand', np.NaN, False)
-    df.insert(cpu_column_index + 2, 'cpu_series', np.NaN, False)
-    df.insert(cpu_column_index + 3, 'cpu_model', np.NaN, False)
-
     df['cpu'] = df['cpu'].str.replace(r'_|-', ' ', regex=True)
 
     def extractCPUspeed(row):
@@ -382,34 +392,6 @@ def manuallyCleanCPUs(df):
                 row['cpu'] = re.sub(pattern, '', str(row['cpu']))
         return row
     df = df.apply(extractCPUspeed, axis=1)
-
-    problematic_cpus = {
-        'a series dual core a4 3300m': {
-            'cpu_brand': 'amd',
-            'cpu_series': 'a4',
-            'cpu_model': '3300m'
-        },
-        'evo i7 1260p': {
-            'cpu_brand': 'intel',
-            'cpu_series': 'evo i7',
-            'cpu_model': '1260p'
-        },
-        'arm 7100': {
-            'cpu_brand': 'arm',
-            'cpu_series': '7100',
-            'cpu_model': np.NaN
-        }, 
-        'atom z8350': {
-            'cpu_brand': 'intel',
-            'cpu_series': 'atom',
-            'cpu_model': 'z8350'
-        }
-    }
-    for model, values in problematic_cpus.items():
-        mask = df['cpu'] == model
-        for column, new_value in values.items():
-            df.loc[mask, column] = new_value
-            df.loc[mask, 'cpu'] = np.NaN
 
     return df
 
@@ -424,19 +406,25 @@ def standardiseCPU(df):
                 r'^(?:intel )?(?:(?P<cpu_series>mobile) cpu)$',
                 r'^(?:intel )?(?P<cpu_series>atom|xeon)$',
                 r'^(?P<cpu_series>8032)$',
-                r'^(?:intel )?(?P<cpu_series>core (?:2 duo|2|duo))(?: quad)?(?: (?P<cpu_model>p\d{4}))?$'
+                r'^(?:intel )?(?P<cpu_series>core (?:2 duo|2|duo))(?: quad)?(?: (?P<cpu_model>p\d{4}))?$',
+                r'^(?P<cpu_series>evo i7) (?P<cpu_model>1260p)$',
+                r'^(?P<cpu_series>atom) (?P<cpu_model>z8350)$'
             },
             'amd': {
                 r'^(?:amd )?(?P<cpu_series>ryzen\s?[3579])(?:\s(?P<cpu_model>\d{4}[hux]))?$',
                 r'(?:amd )?(?:kabini )?(?P<cpu_series>[ar] series|a\d{1,2})(?: (?P<cpu_model>\d{4}[km]))?',
                 r'^(?P<cpu_series>athlon(?: silver)?)(?:\s(?P<cpu_model>\d{4}u))?$',
                 r'(?P<cpu_series>cortex)(?: (?P<cpu_model>a\d{1,2}))?',
+                r'^a series dual core (?P<cpu_series>a4) (?P<cpu_model>3300m)$'
             },
             'mediatek': {
                 r'^(?:mediatek)[ _](?P<cpu_model>.*)$',
             },
             'apple': {
                 r'^(?:apple )(?P<cpu_model>m[12])?$',
+            },
+            'arm': {
+                r'^arm (?P<cpu_series>7100)$'
             },
             'snapdragon': {
                 r'^snapdragon$',
@@ -548,11 +536,6 @@ def standardiseCPUSpeeds(df):
     return df
 
 def manuallyCleanGPUs(df):
-    # Add new columns
-    graphics_column_index = df.columns.get_loc('graphics')
-    df.insert(graphics_column_index + 1, 'graphics_brand', np.NaN, False)
-    df.insert(graphics_column_index + 2, 'graphics_details', np.NaN, False)
-
     problematic_gpus = {
         'amd athlon silver': {
             'cpu_model': 'silver',
@@ -578,13 +561,100 @@ def manuallyCleanGPUs(df):
             'graphics': 'dedicated'
         }
     }
-    for gpu, values in problematic_gpus.items():
-        mask = df['graphics_coprocessor'] == gpu
-        df.loc[mask, 'graphics_coprocessor'] = np.NaN
-        for column, new_value in values.items():
-            df.loc[mask, column] = new_value
-        
+    manualClean(df, problematic_gpus, 'graphics_coprocessor', True)
     return df
+
+def extractGPUdetails(row):
+    graphicsPatterns = {
+        'dedicated': {
+            np.NaN: {
+                r'': np.NaN,
+            },
+            'nvidia': {
+                r'nvidia optimus graphics': 'optimus graphics',
+                r'(?P<graphics_details>quadro rtx\s*\d{4}(?:\s*(?:ti|super))?)': '__EXTRACT__',
+                r'(?P<graphics_details>rtx\s*\d{4}(?:\s*(?:ti|super))?)': '__EXTRACT__',
+                r'(?P<graphics_details>rtx\s*a\d{1,2}00)': '__EXTRACT__',
+                r'nvidia geforce (?P<graphics_details>mx\d{2}0)': '__EXTRACT__',
+                r'(?P<graphics_details>(?:quadro )?t\d{3,4})': '__EXTRACT__',
+                r'geforce(?: rtx| gtx)?(?: (?P<graphics_details>\d{4}(?:\s?(?:oc|ti))?|a3000|940mx))': '__EXTRACT__',
+                r'(?P<graphics_details>quadro (?:p\d{3,4}|k?\d{4}m?))': '__EXTRACT__',
+                r'^(?P<graphics_details>qn20-m1-r)$': '__EXTRACT__'
+            },  
+            'amd': {
+                r'amd (?P<graphics_details>radeon r\d)': '__EXTRACT__',
+                r'wx vega': 'radeon pro wx vega m gl',
+                r'(?:amd )?(?P<graphics_details>(?:ati mobility )?radeon(?: graphics)?(?: (?:hd|pro|rx))? \d{3,4}(?!.*m))': '__EXTRACT__'
+            },
+            'intel': {
+                r'intel (?P<graphics_details>arc a\d{3}m)': '__EXTRACT__'
+            }
+        },
+        'integrated': {
+            'intel': {
+                r'(?P<graphics_details>uhd(?: graphics)?(?: premium| \d{3})?)': '__EXTRACT__',
+                r'(?P<graphics_details>hd graphics(?: \d{3,4})?)(?!nvidia)': '__EXTRACT__',
+                r'iris plus': 'iris xe plus graphics',
+                r'iris(?!.*gpu)|intel xe': 'iris xe graphics',
+                r'intel (?P<graphics_details>hd(?: \d{3,4})?)': '__EXTRACT__',
+                r'(?P<graphics_details>gt2 graphics)': '__EXTRACT__',
+                r'^(?P<graphics_details>hd integrated graphics)$': '__EXTRACT__',
+                r'intel (?P<graphics_details>\d{3}u)': '__EXTRACT__'
+            },
+            'nvidia': {
+                r'nvidia geforce gtx (?P<graphics_details>\d{3}m)': '__EXTRACT__'
+            },
+            'amd': {
+                r'amd (?P<graphics_details>radeon (?:rx )?vega (?:3|8|9|11))': '__EXTRACT__',
+                r'^(?:integrated )?(?:amd )?radeon(?: graphics)?$': 'radeon graphics',
+                r'(?P<graphics_details>radeon (?:(?:rx|hd) )?\d{3,4}m)': '__EXTRACT__',
+                r'^amd (?P<graphics_details>integrated graphics)$': '__EXTRACT__',
+                r'^amd (?P<graphics_details>radeon graphics 5)$': '__EXTRACT__'
+            },
+            'mediatek': {
+                r'mediatek': np.NaN
+            },
+            'imagination technologies': {
+                r'^(?P<graphics_details>powervr gx6250)$': '__EXTRACT__'
+            },
+            'apple': {
+                r'apple integrated graphics': np.NaN
+            },
+            'qualcomm': {
+                r'(?P<graphics_details>adreno 618)': '__EXTRACT__'
+            },
+            'arm': {
+                r'(?P<graphics_details>mali-g[57]2 (?:mp3|2ee mc2)?)': '__EXTRACT__'
+            },
+            np.NaN: {
+                r'^embedded$|^integrated(?: ?graphics)?$|^shared$': np.NaN
+            }
+        },
+        '__KEEP__': {
+            'nvidia': {
+                r'nvidia': np.NaN
+            },
+            'intel': {
+                r'intel': np.NaN
+            }
+        }
+    }
+    for graphics_type, graphics_brands in graphicsPatterns.items():
+        for graphics_brand, patterns in graphics_brands.items():
+            for pattern, overwriteValue in patterns.items():
+                if match := re.search(pattern, str(row['graphics_coprocessor'])):
+                    if graphics_type != '__KEEP__':
+                        row['graphics'] = graphics_type
+                    row['graphics_brand'] = graphics_brand
+
+                    if (pd.isna(row['graphics_details']) or row['graphics_details'] == ''):
+                        if details := match.groupdict().get('graphics_details'):
+                            row['graphics_details'] = details
+                        else:
+                            row['graphics_details'] = overwriteValue
+                    
+    row['graphics_coprocessor'] = np.NaN
+    return row
 
 def standardiseGPU(df):
     # Fix spellings and duplication
@@ -615,99 +685,8 @@ def standardiseGPU(df):
     # Remove all non-alphanumeric characters
     df['graphics_coprocessor'] = df['graphics_coprocessor'].replace(r'[^A-Za-z0-9, \-]', '', regex=True)
 
-    def extractGPUdetails(row):
-        graphicsPatterns = {
-            'dedicated': {
-                np.NaN: {
-                    r'': np.NaN,
-                },
-                'nvidia': {
-                    r'nvidia optimus graphics': 'optimus graphics',
-                    r'(?P<graphics_details>quadro rtx\s*\d{4}(?:\s*(?:ti|super))?)': '__EXTRACT__',
-                    r'(?P<graphics_details>rtx\s*\d{4}(?:\s*(?:ti|super))?)': '__EXTRACT__',
-                    r'(?P<graphics_details>rtx\s*a\d{1,2}00)': '__EXTRACT__',
-                    r'nvidia geforce (?P<graphics_details>mx\d{2}0)': '__EXTRACT__',
-                    r'(?P<graphics_details>(?:quadro )?t\d{3,4})': '__EXTRACT__',
-                    r'geforce(?: rtx| gtx)?(?: (?P<graphics_details>\d{4}(?:\s?(?:oc|ti))?|a3000|940mx))': '__EXTRACT__',
-                    r'(?P<graphics_details>quadro (?:p\d{3,4}|k?\d{4}m?))': '__EXTRACT__',
-                    r'^(?P<graphics_details>qn20-m1-r)$': '__EXTRACT__'
-                },  
-                'amd': {
-                    r'amd (?P<graphics_details>radeon r\d)': '__EXTRACT__',
-                    r'wx vega': 'radeon pro wx vega m gl',
-                    r'(?:amd )?(?P<graphics_details>(?:ati mobility )?radeon(?: graphics)?(?: (?:hd|pro|rx))? \d{3,4}(?!.*m))': '__EXTRACT__'
-                },
-                'intel': {
-                    r'intel (?P<graphics_details>arc a\d{3}m)': '__EXTRACT__'
-                }
-            },
-            'integrated': {
-                'intel': {
-                    r'(?P<graphics_details>uhd(?: graphics)?(?: premium| \d{3})?)': '__EXTRACT__',
-                    r'(?P<graphics_details>hd graphics(?: \d{3,4})?)(?!nvidia)': '__EXTRACT__',
-                    r'iris plus': 'iris xe plus graphics',
-                    r'iris(?!.*gpu)|intel xe': 'iris xe graphics',
-                    r'intel (?P<graphics_details>hd(?: \d{3,4})?)': '__EXTRACT__',
-                    r'(?P<graphics_details>gt2 graphics)': '__EXTRACT__',
-                    r'^(?P<graphics_details>hd integrated graphics)$': '__EXTRACT__',
-                    r'intel (?P<graphics_details>\d{3}u)': '__EXTRACT__'
-                },
-                'nvidia': {
-                    r'nvidia geforce gtx (?P<graphics_details>\d{3}m)': '__EXTRACT__'
-                },
-                'amd': {
-                    r'amd (?P<graphics_details>radeon (?:rx )?vega (?:3|8|9|11))': '__EXTRACT__',
-                    r'^(?:integrated )?(?:amd )?radeon(?: graphics)?$': 'radeon graphics',
-                    r'(?P<graphics_details>radeon (?:(?:rx|hd) )?\d{3,4}m)': '__EXTRACT__',
-                    r'^amd (?P<graphics_details>integrated graphics)$': '__EXTRACT__',
-                    r'^amd (?P<graphics_details>radeon graphics 5)$': '__EXTRACT__'
-                },
-                'mediatek': {
-                    r'mediatek': np.NaN
-                },
-                'imagination technologies': {
-                    r'^(?P<graphics_details>powervr gx6250)$': '__EXTRACT__'
-                },
-                'apple': {
-                    r'apple integrated graphics': np.NaN
-                },
-                'qualcomm': {
-                    r'(?P<graphics_details>adreno 618)': '__EXTRACT__'
-                },
-                'arm': {
-                    r'(?P<graphics_details>mali-g[57]2 (?:mp3|2ee mc2)?)': '__EXTRACT__'
-                },
-                np.NaN: {
-                    r'^embedded$|^integrated(?: ?graphics)?$|^shared$': np.NaN
-                }
-            },
-            '__KEEP__': {
-                'nvidia': {
-                    r'nvidia': np.NaN
-                },
-                'intel': {
-                    r'intel': np.NaN
-                }
-            }
-        }
-        for graphics_type, graphics_brands in graphicsPatterns.items():
-            for graphics_brand, patterns in graphics_brands.items():
-                for pattern, overwriteValue in patterns.items():
-                    if match := re.search(pattern, str(row['graphics_coprocessor'])):
-                        if graphics_type != '__KEEP__':
-                            row['graphics'] = graphics_type
-                        row['graphics_brand'] = graphics_brand
-
-                        if (pd.isna(row['graphics_details']) or row['graphics_details'] == ''):
-                            if details := match.groupdict().get('graphics_details'):
-                                row['graphics_details'] = details
-                            else:
-                                row['graphics_details'] = overwriteValue
-                        
-                        # row['graphics_coprocessor'] = np.NaN
-        return row
-    
     df = df.apply(extractGPUdetails, axis=1)
+    df = df.drop(columns=['graphics_coprocessor'])
 
     return df
 
@@ -718,7 +697,8 @@ def renameColumns(df):
         'harddisk': 'harddisk_gb',
         'ram': 'ram_gb',
         'cpu_speed': 'cpu_speed_ghz',
-        'price': 'price_usd'
+        'price': 'price_usd',
+        'OS': 'os'
     }
     return df.rename(columns=columnNameHashMap)
 
@@ -737,24 +717,26 @@ def printNumEmpty(df):
         print(str(nulls[column]).rjust(7), end="\n")
 
 if __name__ == "__main__":
-    function_calls = [initialCleaning,
-                      manuallyCleanModels, 
-                      standardiseModels, 
-                      standardiseBrands, 
-                      standardiseBrandModels,
-                      manuallyCleanColors, 
-                      standardiseColors, 
-                      cleanScreensPrices, 
-                      standardiseRAMHarddisk, 
-                      standardiseOS, 
-                      manuallyCleanCPUs,
-                      standardiseCPU, 
-                      standardiseSpecialFeatures, 
-                      standardiseCPUSpeeds,
-                      manuallyCleanGPUs,
-                      standardiseGPU,
-                      renameColumns
-                      ]
+    function_calls = [
+        initialCleaning,
+        addColumns,
+        manuallyCleanModels, 
+        standardiseModels, 
+        standardiseBrands, 
+        standardiseBrandModels,
+        manuallyCleanColors, 
+        standardiseColors, 
+        cleanScreensPrices, 
+        standardiseRAMHarddisk, 
+        standardiseOS, 
+        manuallyCleanCPUs,
+        standardiseCPU, 
+        standardiseSpecialFeatures, 
+        standardiseCPUSpeeds,
+        manuallyCleanGPUs,
+        standardiseGPU,
+        renameColumns,
+    ]
     
     df = pd.read_excel('amazon_laptop_2023.xlsx')
 
@@ -778,12 +760,3 @@ if __name__ == "__main__":
     print(df.dtypes)
     print("".join(['-'] * 70))
     printNumEmpty(df)
-
-    # # Most common words in the special features column
-    # print("".join(['-'] * 70))
-    # all = []
-    # for index, value in df.iterrows():
-    #     all += [val.strip() for val in str(value['special_features']).split(',')]
-    # myCounter = Counter(all)
-    # for el, count in myCounter.most_common():
-    #     print(f"{el}: {count}")
