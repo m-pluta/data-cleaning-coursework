@@ -377,6 +377,8 @@ def standardiseOS(df):
         r'.*(unknown|no).*': np.NaN
     }
     df['OS'] = df['OS'].replace(osHashMap, regex=True)
+
+    #TODO Dont just delete, keep it, just delete the column value
     df = df[df['OS'] != 'hp thinpro']
 
     return df
@@ -567,9 +569,6 @@ def manuallyCleanGPUs(df):
 def extractGPUdetails(row):
     graphicsPatterns = {
         'dedicated': {
-            np.NaN: {
-                r'': np.NaN,
-            },
             'nvidia': {
                 r'nvidia optimus graphics': 'optimus graphics',
                 r'(?P<graphics_details>quadro rtx\s*\d{4}(?:\s*(?:ti|super))?)': '__EXTRACT__',
@@ -637,7 +636,12 @@ def extractGPUdetails(row):
             'intel': {
                 r'intel': np.NaN
             }
-        }
+        },
+        np.NaN: {
+            np.NaN: {
+                r'^$': np.NaN,
+            }
+        },
     }
     for graphics_type, graphics_brands in graphicsPatterns.items():
         for graphics_brand, patterns in graphics_brands.items():
