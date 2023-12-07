@@ -1,4 +1,3 @@
-import time
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -271,7 +270,7 @@ def standardiseBrandModels(df):
 
     # Reasoning: Remove all rows that do not contain any information in their model column
     #            This is indicated by either an empty string or NaN value
-    df['model'].replace(r'^$', pd.NA, regex=True, inplace=True)
+    df['model'].replace(r'^$', np.NaN, regex=True, inplace=True)
     df.dropna(subset=['model'], inplace=True)
     df['model'] = df['model'].str.strip()
     return df
@@ -706,6 +705,46 @@ def renameColumns(df):
     }
     return df.rename(columns=columnNameHashMap)
 
+def postProcessing(df):
+    categorical_columns = [
+        'brand', 
+        'model', 
+        'colour', 
+        'cpu_brand', 
+        'cpu_series', 
+        'cpu_model', 
+        'os', 
+        'special_features', 
+        'graphics', 
+        'graphics_brand', 
+        'graphics_details'
+    ]
+    integer_columns = [
+        'harddisk_gb', 
+        'ram_gb'
+    ]
+    float_columns = [
+        'screen_size_inches', 
+        'cpu_speed_ghz', 
+        'rating',
+        'price_usd'        
+    ]
+
+    df[categorical_columns] = df[categorical_columns].fillna('_MISSING_')
+
+    df[categorical_columns] = df[categorical_columns].astype(str)
+    df[integer_columns] = df[integer_columns].astype('Int64')
+    df[float_columns] = df[float_columns].astype(float)
+
+    df[categorical_columns] = df[categorical_columns].replace('\s+', ' ', regex=True)
+    df[categorical_columns] = df[categorical_columns].apply(lambda x: x.str.strip(', '))
+
+    df = df.drop_duplicates(ignore_index=True)
+
+    df.reset_index(drop=True, inplace=True)
+
+    return df
+
 def outputDataToFile(df, path):
     df.to_excel(path, index=False)  # index=False to exclude the index column in the output file
 
@@ -740,21 +779,14 @@ if __name__ == "__main__":
         manuallyCleanGPUs,
         standardiseGPU,
         renameColumns,
+        postProcessing
     ]
     
     df = pd.read_excel('amazon_laptop_2023.xlsx')
 
-    total_elapsed_time = 0
-
     for function in function_calls:
-        start_time = time.time()  # Start the timer
         df = function(df)
-        end_time = time.time()  # End the timer
-        elapsed_time = (end_time - start_time) * 1000  # Calculate the elapsed time in milliseconds
-        total_elapsed_time += elapsed_time
-        print(f"Function {function.__name__}".ljust(36) + f"took {elapsed_time:.0f}".ljust(9) + " ms")
 
-    print("".ljust(36) + f"took {total_elapsed_time:.0f}".ljust(9) + " ms")
     outputDataToFile(df, OUT_FILEPATH)
 
     ### TESTING ###
