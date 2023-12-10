@@ -263,7 +263,7 @@ def standardiseBrandModels(df):
     #            This is redundant data and serves no purpose
     def removeBrandFromModel(row):
         if not pd.isna(row['model']) and not pd.isna(row['brand']):
-            if row['brand'] in row['model']:
+            if row['brand'] in str(row['model']):
                 row['model'] = row['model'].replace(row['brand'], '')
         return row
     df = df.apply(removeBrandFromModel, axis=1)
@@ -455,7 +455,7 @@ def standardiseCPU(df):
     return df
 
 def standardiseSpecialFeatures(df):
-    df['special_features'] = df['special_features'].replace(r'wifi & bluetooth', 'wifi,bluetooth', regex=True)
+    df['special_features'] = df['special_features'].replace(r'&', ',', regex=True)
 
     def enumSpecialFeatures(row):
         if pd.isna(row['special_features']):
@@ -546,9 +546,9 @@ def manuallyCleanGPUs(df):
             'cpu_model': '8650u',
         },
         'amd athlon': {},
-        'intel celeron': {
+        'intel celeron': {  
             'cpu_brand': 'intel',
-            'cpu_series': 'celeron'
+            'cpu_series': 'celeron',
         },
         'm1 pro': {
             'cpu_brand': 'apple',
@@ -556,10 +556,10 @@ def manuallyCleanGPUs(df):
             'cpu_model': 'm1 pro',
         },
         'xps9300-7909slv-pus': {
-            'model': 'xps9300-7909slv-pus'
+            'model': 'xps9300-7909slv-pus',
         },
         'integrated intel iris xe plus gpu': {
-            'graphics': 'dedicated'
+            'graphics': 'dedicated',
         }
     }
     manualClean(df, problematic_gpus, 'graphics_coprocessor', True)
